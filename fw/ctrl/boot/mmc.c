@@ -63,7 +63,12 @@ unsigned char MMC_Init(void)
 
     CardType = CARDTYPE_NONE;
 
-    for(n=0; n<16; n++) if (MMC_Command(CMD0, 0) == 0x01) break; // try to send CMD0 multiple times
+    for(n=0; n<2000; n++)
+	{
+		if (MMC_Command(CMD0, 0) == 0x01)
+			break; // try to send CMD0 multiple times
+	    WaitTimer(200); // 20ms delay
+	}
     if (n<16) // got CMD0 IDLE response
     { // idle state
         timeout = GetTimer(2000); // initialization timeout 1000 ms
