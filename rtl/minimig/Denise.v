@@ -268,7 +268,6 @@ sprites sprm0
 (
 	.clk(clk),
 	.reset(reset),
-	.ecs(1'b0),
 	.reg_address_in(reg_address_in),
 	.hpos(hpos),
 	.data_in(data_in),
@@ -523,7 +522,7 @@ module collision
 	input 	[15:0] data_in,			//bus data in
 	output	[15:0] data_out,		//bus data out
 	input	[5:0] bpldata,			//bitplane serial video data in
-	input	[7:0] nsprite	
+	input	[7:0] nsprite
 );
 
 //register names and adresses		
@@ -556,10 +555,10 @@ assign oddmatch = bm[4] & bm[2] & bm[0];
 assign evenmatch = bm[5] & bm[3] & bm[1];
 
 //generate sprite group match signal
-assign sprmatch[0] = nsprite[0] | (nsprite[1] & clxcon[12]);
-assign sprmatch[1] = nsprite[2] | (nsprite[3] & clxcon[13]);
-assign sprmatch[2] = nsprite[4] | (nsprite[5] & clxcon[14]);
-assign sprmatch[3] = nsprite[6] | (nsprite[7] & clxcon[15]);
+assign sprmatch[0] = (nsprite[0] | (nsprite[1]) & clxcon[12]);
+assign sprmatch[1] = (nsprite[2] | (nsprite[3]) & clxcon[13]);
+assign sprmatch[2] = (nsprite[4] | (nsprite[5]) & clxcon[14]);
+assign sprmatch[3] = (nsprite[6] | (nsprite[7]) & clxcon[15]);
 
 //--------------------------------------------------------------------------------------
 

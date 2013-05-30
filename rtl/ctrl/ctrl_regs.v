@@ -25,8 +25,8 @@ module ctrl_regs #(
   output reg            ack,
   output wire           err,
   // registers
-  output reg            sys_rst,
-  output reg            minimig_rst,
+  output reg            sys_rst=0,
+  output reg            minimig_rst=0,
   input  wire [  4-1:0] ctrl_cfg,
   output reg  [  4-1:0] ctrl_status, 
   output wire           uart_txd,
@@ -121,7 +121,7 @@ always @ (posedge clk, posedge rst) begin
   if (rst)
     ctrl_status <= #1 4'b0;
   else if (ctrl_en)
-    ctrl_status <= #1 dat_w[18:15];
+    ctrl_status <= #1 dat_w[19:16];
 end
 
 
@@ -337,7 +337,7 @@ always @ (*) begin
       spi_cs_n_en     = 1'b0;
       spi_dat_en      = 1'b0;
       spi_block_en    = 1'b0;
-    case(adr[5:2])
+    case(adr[4:2])
       REG_RST       : sys_rst_en      = 1'b1;
       REG_CTRL      : ctrl_en         = 1'b1;
       REG_UART_TX   : tx_en           = 1'b1;
@@ -379,6 +379,7 @@ always @ (*) begin
   case(adr_r[4:2])
     REG_CTRL      : dat_r = {28'h0000000, ctrl_cfg};
     REG_TIMER     : dat_r = {16'h0000, timer}; 
+    REG_SPI_DIV   : dat_r = {26'h0000000, spi_div_r};
     REG_SPI_DAT   : dat_r = {24'h000000, spi_dat_r};
     default       : dat_r = 32'hxxxxxxxx;
   endcase
@@ -393,12 +394,12 @@ end
 // ack
 always @ (*) begin
   case(adr[4:2])
-    REG_UART_TX   : ack = cs && tx_ready;
+    REG_UART_TX   : ack = tx_ready;
     REG_SPI_DIV,
     REG_SPI_CS,
     REG_SPI_DAT,
-    REG_SPI_BLOCK : ack = cs && !(spi_act | spi_act_d);
-    default       : ack = cs;
+    REG_SPI_BLOCK : ack = !(spi_act | spi_act_d);
+    default       : ack = 1'b1;
   endcase
 end
 

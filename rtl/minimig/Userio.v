@@ -59,6 +59,11 @@
 // SB:
 //  06-03-2011  - added autofire without key press & permanent fire at KP0
 // 11-04-2011 - autofire function toggle able via capslock / led status
+// 17-01-2013  - added POTGO write register handling (required by Asterix game)
+//                         
+// RK:
+// 2013-03-21 - more compatible right mouse & second joystick button handling; TODO tests
+
 
 module userio
 (
@@ -79,8 +84,12 @@ module userio
 	input	[5:0] _joy1,			//joystick 1 in (default mouse port)
 	input	[5:0] _joy2,			//joystick 2 in (default joystick port)
   input aflock,         // auto fire lock
+  input [2:0] mouse_btn,
   input _lmb,
   input _rmb,
+  input kbd_mouse_strobe,
+  input [1:0] kbd_mouse_type,
+  input [7:0] kbd_mouse_data,
 	input	[7:0] osd_ctrl,			//OSD control (minimig->host, [menu,select,down,up])
   output  reg keyboard_disabled,  // disables Amiga keyboard while OSD is active
 	input	_scs,					//SPI enable
@@ -106,6 +115,7 @@ module userio
 reg		[5:0] _sjoy1;				//synchronized joystick 1 signals
 reg		[5:0] _xjoy2;				//synchronized joystick 2 signals
 wire	[5:0] _sjoy2;				//synchronized joystick 2 signals
+reg   [15:0] potreg;      // POTGO write
 wire	[15:0] mouse0dat;			//mouse counters
 wire	_mleft;						//left mouse button
 wire	_mthird;					//middle mouse button
@@ -126,6 +136,7 @@ reg   sel_autofire;     // select autofire and permanent fire
 parameter JOY0DAT = 9'h00a;
 parameter JOY1DAT = 9'h00c;
 parameter POTINP  = 9'h016;
+parameter POTGO   = 9'h034;
 parameter JOYTEST = 9'h036;
 
 parameter KEY_MENU  = 8'h69;
@@ -140,6 +151,31 @@ parameter KEY_PGDOWN = 8'h6d;
 
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
+
+// POTGO register
+always @(posedge clk)
+  if (reset)
+    potreg <= 0;
+//    potreg <= 16'hffff;
+  else if (reg_address_in[8:1]==POTGO[8:1])
+    potreg[15:0] <= data_in[15:0];
+
+// potcap reg
+reg  [4-1:0] potcap;
+always @ (posedge clk) begin
+  if (reset)
+    potcap <= 4'h0;
+  else begin
+    if (!_sjoy2[5]) potcap[3] <= 1'b0;
+    else if (potreg[15] & potreg[14]) potcap[3] <= 1'b1;
+    /*if (!1'b1) potcap[2] <= 1'b0;
+    else*/ if (potreg[13]) potcap[2] <= potreg[12];
+    if (!(_mright&_sjoy1[5]&_rmb)) potcap[1] <= 1'b0;
+    else if (potreg[11] & potreg[10]) potcap[1] <= 1'b1;
+    if (!_mthird) potcap[0] <= #1 1'b0;
+    else if (potreg[ 9] & potreg[ 8]) potcap[0] <= 1'b1;
+  end
+end
 
 //autofire pulses generation
 always @(posedge clk)
@@ -220,7 +256,7 @@ always @(posedge clk)
 //--------------------------------------------------------------------------------------
 
 //data output multiplexer
-always @(reg_address_in or joy1enable or _sjoy1 or mouse0dat or _sjoy2 or _mright or _mthird or _rmb)
+always @(*)
 	if ((reg_address_in[8:1]==JOY0DAT[8:1]) && joy1enable)//read port 1 joystick
 		data_out[15:0] = {6'b000000,~_sjoy1[1],_sjoy1[3]^_sjoy1[1],6'b000000,~_sjoy1[0],_sjoy1[2]^_sjoy1[0]};
 	else if (reg_address_in[8:1]==JOY0DAT[8:1])//read port 1 mouse
@@ -228,7 +264,17 @@ always @(reg_address_in or joy1enable or _sjoy1 or mouse0dat or _sjoy2 or _mrigh
 	else if (reg_address_in[8:1]==JOY1DAT[8:1])//read port 2 joystick
 		data_out[15:0] = {6'b000000,~_sjoy2[1],_sjoy2[3]^_sjoy2[1],6'b000000,~_sjoy2[0],_sjoy2[2]^_sjoy2[0]};
 	else if (reg_address_in[8:1]==POTINP[8:1])//read mouse and joysticks extra buttons
-		data_out[15:0] = {1'b0,_sjoy2[5],3'b010,_mright&_sjoy1[5]&_rmb,1'b0,_mthird,8'b00000000};
+//		data_out[15:0] = {1'b0, (1'b1 ? potreg[14]&_sjoy2[5]              : _sjoy2[5]),
+//                      1'b0, (1'b1 ? potreg[12]&1'b1                   : 1'b1),
+//                      1'b0, (1'b1 ? potreg[10]&_mright&_sjoy1[5]&_rmb : _mright&_sjoy1[5]&_rmb),
+//                      1'b0, (1'b1 ? potreg[ 8]&_mthird                : _mthird),
+//                      8'h00};
+		data_out[15:0] = {1'b0, potcap[3],
+                      1'b0, potcap[2],
+                      1'b0, potcap[1],
+                      1'b0, potcap[0],
+                      8'h00};
+
 	else
 		data_out[15:0] = 16'h0000;
 
@@ -243,21 +289,50 @@ assign test_data = data_in[15:0];
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------
 
+`ifdef MINIMIG_PS2_MOUSE
+
 //instantiate mouse controller
 ps2mouse pm1
 (
-	.clk(clk),
-	.reset(reset),
-	.ps2mdat(ps2mdat),
-	.ps2mclk(ps2mclk),
-	.ycount(mouse0dat[15:8]),
-	.xcount(mouse0dat[7:0]),
-	._mleft(_mleft),
-	._mthird(_mthird),
-	._mright(_mright),
-	.test_load(test_load),
-	.test_data(test_data)
+  .clk(clk),
+  .reset(reset),
+  .ps2mdat(ps2mdat),
+  .ps2mclk(ps2mclk),
+  .ycount(mouse0dat[15:8]),
+  .xcount(mouse0dat[7:0]),
+  ._mleft(_mleft),
+  ._mthird(_mthird),
+  ._mright(_mright),
+  .test_load(test_load),
+  .test_data(test_data)
 );
+
+`else
+
+reg [7:0] xcount;
+reg [7:0] ycount;
+
+assign mouse0dat[7:0] = xcount;
+assign mouse0dat[15:8] = ycount;
+
+assign _mleft = ~mouse_btn[0];
+assign _mright = ~mouse_btn[1];
+assign _mthird = ~mouse_btn[2];
+
+always @(posedge kbd_mouse_strobe) begin
+  if(reset) begin
+      xcount <= 8'b00000000;
+      ycount <= 8'b00000000;
+  end else begin
+    if(kbd_mouse_type == 0)
+      xcount[7:0] <= xcount[7:0] + kbd_mouse_data[7:0];
+    else if(kbd_mouse_type == 1)
+      ycount[7:0] <= ycount[7:0] + kbd_mouse_data[7:0];
+  end   
+end
+
+`endif
+
 
 //--------------------------------------------------------------------------------------
 //--------------------------------------------------------------------------------------

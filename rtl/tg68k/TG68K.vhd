@@ -156,13 +156,15 @@ BEGIN
 	datatg68 <= fromram WHEN sel_fast='1' ELSE r_data WHEN sel_autoconfig='0' ELSE autoconfig_data&r_data(11 downto 0); 
 --	toram <= data_write;
 	
-    sel_autoconfig <= '1' when cpuaddr(23 downto 19)="11101" AND autoconfig_out='1' ELSE '0'; --$E80000 - $EFFFFF
-	sel_fast <= '1' when state/="01" AND (cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" OR cpuaddr(23 downto 21)="011" OR cpuaddr(23 downto 21)="100") ELSE '0'; --$200000 - $9FFFFF
+    sel_autoconfig <= '1' when memcfg(5 downto 4)/="00" AND cpuaddr(23 downto 19)="11101" AND autoconfig_out='1' ELSE '0'; --$E80000 - $EFFFFF
+	sel_fast <= '1' when memcfg(5 downto 4)/="00" AND state/="01" AND (cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" OR cpuaddr(23 downto 21)="011" OR cpuaddr(23 downto 21)="100") ELSE '0'; --$200000 - $9FFFFF
+--  sel_autoconfig <= '0';
+--  sel_fast <= '0';
 --	sel_fast <= '1' when cpuaddr(23 downto 21)="001" OR cpuaddr(23 downto 21)="010" ELSE '0'; --$200000 - $5FFFFF
 --	sel_fast <= '1' when cpuaddr(23 downto 19)="11111" ELSE '0'; --$F800000;
 --	sel_fast <= '0'; --$200000 - $9FFFFF
 --	sel_fast <= '1' when cpuaddr(24)='1' AND state/="01" ELSE '0'; --$1000000 - $1FFFFFF
-	ramcs <= NOT sel_fast;-- OR (state(0) AND NOT state(1));
+	ramcs <= (NOT sel_fast) or slower(0);-- OR (state(0) AND NOT state(1));
 --	cpuDMA <= NOT ramcs;
 	cpuDMA <= sel_fast;
 	cpustate <= clkena&slower(1 downto 0)&ramcs&state;
@@ -204,7 +206,7 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
 		skipFetch => skipFetch 		-- : out std_logic
         );
  
-	PROCESS (clk)
+	PROCESS (clk, memcfg, cpuaddr)
 	BEGIN
 		autoconfig_data <= "1111";
 		IF memcfg(5 downto 4)/="00" THEN
@@ -288,7 +290,7 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
 	END PROCESS;
 				
 	
-	PROCESS (clk)
+	PROCESS (clk, clkena_in, enaWRreg, state, ena7RDreg, clkena_e, ramready)
 	BEGIN
 		state_ena <= '0';
 		IF clkena_in='1' AND enaWRreg='1' AND (state="01" OR (ena7RDreg='1' AND clkena_e='1') OR ramready='1') THEN
@@ -301,15 +303,15 @@ pf68K_Kernel_inst: TG68KdotC_Kernel
 		END IF;	
 		IF rising_edge(clk) THEN
         	IF clkena='1' THEN
-				slower <= "1000";
+				slower <= "0111";
 			ELSE 
-				slower(3 downto 0) <= enaWRreg&slower(3 downto 1);
+				slower(3 downto 0) <= '0'&slower(3 downto 1); -- enaWRreg&slower(3 downto 1);
 --				slower(0) <= NOT slower(3) AND NOT slower(2);
 			END IF;	
 		END IF;	
 	END PROCESS;
 				
-PROCESS (clk, reset, state, as_s, as_e, rw_s, rw_e, uds_s, uds_e, lds_s, lds_e)
+PROCESS (clk, reset, state, as_s, as_e, rw_s, rw_e, uds_s, uds_e, lds_s, lds_e, sel_fast)
 	BEGIN
 		IF state="01" THEN 
 			as <= '1';

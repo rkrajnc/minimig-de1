@@ -170,9 +170,14 @@ module Minimig1
 	output	_ram_we,			//sram write enable
 	output	_ram_oe,			//sram output enable
 	//system	pins
-//  input mclk,       // master system clock (4.433619MHz)
-	input	clk,				//system clock (7.09379 MHz)
 	input	clk28m,				//28.37516 MHz clock
+	input	clk,				//system clock (7.09379 MHz)
+  input clk7_en,      // 7MHz clock enable
+	input c1,			// clock enable signal
+	input c3,			// clock enable signal
+	input cck,			// colour clock enable
+	input [9:0] eclk,			// ECLK enable (1/10th of CLK)
+  input cpu_speed,
 	//rs232 pins
 	input	rxd,				//rs232 receive
 	output	txd,				//rs232 send
@@ -183,6 +188,10 @@ module Minimig1
 	input	[5:0]_joy2,			//joystick 2 [fire2,fire,up,down,left,right] (default joystick port)
   input mouse_btn1, // mouse button 1
   input mouse_btn2, // mouse button 2
+  input [2:0] mouse_btn, // mouse buttons
+  input kbd_mouse_strobe,
+  input [1:0] kbd_mouse_type,
+  input [7:0] kbd_mouse_data,
   input joy_emu_en, // enable keyboard joystick emulation
 	input	_15khz,				//scandoubler disable
 	output	pwrled,				//power led
@@ -262,7 +271,6 @@ wire		ram_lwr;				//ram low byte write enable
 wire		cpu_rd; 				//cpu read enable
 wire		cpu_hwr;				//cpu high byte write enable
 wire		cpu_lwr;				//cpu low byte write enable
-wire		cck;					//colour clock (chipset dma slots indication)
 
 //register address bus
 wire		[8:1] reg_address; 		//main register address bus
@@ -271,10 +279,6 @@ wire		[8:1] reg_address; 		//main register address bus
 wire		kbdrst;					//keyboard reset
 wire		reset;					//global reset
 wire    aflock;
-//wire		clk;					//bus clock
-//wire		clk28m;					//28MHz clock for Amber (and ECS Denise in future)
-wire		c1,c3;					//clock enable signals
-wire		[9:0] eclk;				//E clock enable
 wire		dbr;					//data bus request, Agnus tells CPU that she is using the bus
 wire		dbwe;					//data bus write enable, Agnus tells the RAM it's writing data
 wire		dbs;					//data bus slow down, used for slowing down CPU access to chip, slow and custor register address space
@@ -354,7 +358,7 @@ wire	[1:0] hr_filter;		//hires interpolation filter mode: bit 0 - horizontal, bi
 wire	[1:0] scanline;			//scanline effect configuration
 wire	hires;					//hires signal from Denise for interpolation filter enable in Amber
 wire	aron;					//Action Replay is enabled
-wire	cpu_speed;				//requests CPU to switch speed mode
+//wire	cpu_speed;				//requests CPU to switch speed mode
 wire	turbo;					//CPU is working in turbo mode
 wire	[5:0] memory_config;	//memory configuration
 wire	[3:0] floppy_config;	//floppy drives configuration (drive number and speed)
@@ -409,7 +413,7 @@ assign pwrled = (_led & (led_dim | ~turbo)) ? 1'b0 : 1'b1; // led dim at off-sta
 // power led pwm 
 always @(posedge clk)
   if (_hsync)
-    led_cnt <= led_cnt + 1;
+    led_cnt <= led_cnt + 4'd1;
 
 always @(posedge clk)
   if (!_hsync)
@@ -433,7 +437,7 @@ assign sol_pulse = sol & ~sol_del; // rising edge detection
 reg [3:0] drv_cnt;
 always @(posedge clk)
   if (drv_cnt != 0 && sol_pulse || drv_cnt == 0 && step_pulse && !boot && _change) // count only sol pulses when counter is not zero or step pulses and bootloader is not active
-    drv_cnt <= drv_cnt + 1;
+    drv_cnt <= drv_cnt + 4'd1;
 
 reg drvsnd;
 always @(posedge clk)
@@ -589,12 +593,16 @@ userio USERIO1
 	._fire1(_fire1),
   .aflock(aflock),
 	._joy1(_joy1),
-//	._joy2(_joy2 & joy_emu),
 	._joy2(_joy2 & kb_joy2),
-//  ._lmb(kb_lmb & mou_emu[4] & mouse_btn1),
-//  ._rmb(kb_rmb & mou_emu[5] & mouse_btn2),
+  .mouse_btn(mouse_btn),
   ._lmb(kb_lmb & mouse_btn1),
   ._rmb(kb_rmb & mouse_btn2),
+//	._joy2(_joy2 & joy_emu),
+//  ._lmb(kb_lmb & mou_emu[4] & mouse_btn1),
+//  ._rmb(kb_rmb & mou_emu[5] & mouse_btn2),
+  .kbd_mouse_type(kbd_mouse_type),
+  .kbd_mouse_strobe(kbd_mouse_strobe),
+  .kbd_mouse_data(kbd_mouse_data), 
 	.osd_ctrl(osd_ctrl),
 	.keyboard_disabled(keyboard_disabled),
 	._scs(_scs[1]),
@@ -617,7 +625,7 @@ userio USERIO1
 );
 
 //assign cpu_speed = (chipset_config[0] & ~int7 & ~freeze & ~ovr);
-assign cpu_speed = 1'b0;
+//assign cpu_speed = 1'b0;
 
 //instantiate Denise
 Denise DENISE1
@@ -644,7 +652,7 @@ Denise DENISE1
 //instantiate Amber
 Amber AMBER1
 (		
-	.clk28m(clk28m),
+	.clk(clk28m),
 	.dblscan(_15khz),
 	.lr_filter(lr_filter),
 	.hr_filter(hr_filter),
@@ -685,6 +693,9 @@ ciaa CIAA1
 	.kbdrst(kbdrst),
 	.kbddat(kbddat),
 	.kbdclk(kbdclk),
+  .kbd_mouse_type(kbd_mouse_type),
+  .kbd_mouse_strobe(kbd_mouse_strobe),
+  .kbd_mouse_data(kbd_mouse_data), 
   .keyboard_disabled(keyboard_disabled),
 	.osd_ctrl(osd_ctrl),
   ._lmb(kb_lmb),
@@ -737,7 +748,7 @@ m68k_bridge CPU1
 	.xbs(xbs),
   .nrdy(gayle_nrdy),
 	.bls(bls),
-	.cpu_speed(cpu_speed),
+	.cpu_speed(cpu_speed & ~int7 & ~ovr & ~usrrst & ~bootrst),
   .memory_config(memory_config[3:0]),
 	.turbo(turbo),
 	._as(_cpu_as),
@@ -910,10 +921,10 @@ gayle GAYLE1
 //  .q(boot_data)
 //);
 
-hostboot BOOTROM1 (
-  .clk    (clk),
-  .adr    (cpu_address[10:1]),
-  .dat    (boot_data)
+amiga_boot BOOTROM1 (
+  .clock    (clk),
+  .address  (cpu_address[8:1]),
+  .q        (boot_data)
 );
 
 assign boot_data_out[15:0] = (sel_boot) ? boot_data[15:0] : 16'h0000;
@@ -928,20 +939,6 @@ syscontrol CONTROL1
 	.reset(reset),
 	.boot(boot),
 	.boot_rst(bootrst)
-);
-
-//instantiate clock generator
-clock_generator CLOCK1
-(	
-//	.mclk(mclk),
-	.clk28m(clk28m),	// 28.37516 MHz clock output
-	.c1(c1),			// clock enable signal
-	.c3(c3),			// clock enable signal
-	.cck(cck),			// colour clock enable
-	.clk(clk),			// 7.09379  MHz clock output
-//	.cpu_clk(cpu_clk),
-//	.turbo(turbo),
-	.eclk(eclk)			// ECLK enable (1/10th of CLK)
 );
 
 
@@ -1064,7 +1061,7 @@ module bank_mapper
 );
 
 
-always @(aron or memory_config or chip0 or chip1 or chip2 or chip3 or slow0 or slow1 or slow2 or kick or cart or ecs)
+always @(*)
 begin
   case ({aron,memory_config})
     5'b0_0000 : bank = {  1'b0,  1'b0,  1'b0,  1'b0,     kick,  1'b0,  1'b0, chip0 | chip1 | chip2 | chip3 }; // 0.5M CHIP
@@ -1240,6 +1237,7 @@ assign		_ce[3:0] = {~|bank[7:6],~|bank[5:4],~|bank[3:2],~|bank[1:0]};
 
 // ram address bus
 assign		address = {bank[7]|bank[6]|bank[5]|bank[4],bank[7]|bank[6]|bank[3]|bank[2],bank[7]|bank[5]|bank[3]|bank[1],address_in[18:1]};
+//assign address = {bank[7]|bank[5]|bank[3]|bank[1],address_in[18:1]};
 //always @(posedge clk28m)
 //	if (c1 && !c3 && enable)	// set address in Q1		
 //		address <= {bank[7]|bank[5]|bank[3]|bank[1],address_in[18:1]};
@@ -1375,7 +1373,10 @@ reg		_ta;					// transfer acknowledge
 always @(posedge clk)
 	if (_as)
 		turbo <= cpu_speed;
-		
+
+wire  turbo_cpu;
+assign turbo_cpu = 1'b0;
+	
 //latched valid peripheral address
 always @(posedge clk)
 	lvpa <= vpa;
@@ -1418,7 +1419,7 @@ always @(negedge clk or posedge _as)
 assign _dtack = (_ta_n );
 
 // synchronous control signals
-assign enable = ((~l_as & ~l_dtack & ~cck & ~turbo) | (~l_as28m & l_dtack & ~(dbr & xbs) & ~nrdy & turbo));
+assign enable = ((~l_as & ~l_dtack & ~cck & ~turbo_cpu) | (~l_as28m & l_dtack & ~(dbr & xbs) & ~nrdy & turbo_cpu));
 assign rd = (enable & lr_w);
 // in turbo mode l_uds and l_lds may be delayed by 35 ns
 assign hwr = (enable & ~lr_w & ~l_uds);
