@@ -67,6 +67,7 @@ unsigned char MMC_Init(void)
       TIMER_wait(1);
       if (MMC_Command(CMD0, 0) == 0x01) break; // try to send CMD0 multiple times
     }
+
     if (n<16) // got CMD0 IDLE response
     { // idle state
         timeout = GetTimer(4000); // initialization timeout 4s
