@@ -109,6 +109,11 @@ char UploadKickstart(char *name)
         SPIN(); SPIN(); SPIN(); SPIN(); SPIN(); SPIN(); SPIN(); SPIN();
         data = ((unsigned int*)sector_buffer)[j>>2];
         if (data != read32(offset+base+i*512+j)) printf("Mismatch @ 0x%08x : 0x%08x != 0x%08x\r", offset+base+i*512+j, data, read32(offset+base+i*512+j));
+        // For 256k roms (e.g. 1.3), copy the content to both 0xf80000 and 0xfc0000.
+        // This is necessary, since minimig will overlay the kickrom at boot to
+        // 0 => 0xf80000, but the 256k roms will expect to run at 0xfc0000
+        if (romfile.size == 0x40000)
+          write32(offset+base+0x40000+i*512+j, data);
       }
       DisableOsd();
     }
