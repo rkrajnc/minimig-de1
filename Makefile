@@ -41,6 +41,7 @@ ctrl_boot: Makefile
 	@echo Building ctrl boot firmware in $(CTRL_BOOT_DIR) ...
 	@$(MAKE) -C $(CTRL_BOOT_DIR) $(BUILD_OPT)
 
+.PHONY: fpga
 fpga: Makefile 
 	@echo Building FPGA in $(FPGA_DIR) ...
 	@$(MAKE) -C $(FPGA_DIR) $(BUILD_OPT)
@@ -55,3 +56,5 @@ clean:
 	@$(MAKE) -C $(CTRL_BOOT_DIR) clean
 	@$(MAKE) -C $(FPGA_DIR) clean
 
+install:
+	@quartus_pgm -mjtag -o "p;$(FPGA_DIR)/out/minimig_de1.sof"

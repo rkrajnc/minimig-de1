@@ -4,6 +4,7 @@
 
 // minimig-de1
 `ifdef MINIMIG_DE1
+`define MINIMIG_MOR1KX
 `define MINIMIG_ALTERA
 `define MINIMIG_CYCLONE2
 //`define MINIMIG_VIDEO_FILTER

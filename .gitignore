@@ -10,3 +10,10 @@
 # ignore some backup files
 *bak
 
+
+fpga/de1/db/
+fpga/de1/incremental_db/
+fpga/de1/out/
+fw/ctrl/bin/
+fw/ctrl_boot/bin/
+rel
