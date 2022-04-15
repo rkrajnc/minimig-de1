@@ -57,4 +57,7 @@ clean:
 	@$(MAKE) -C $(FPGA_DIR) clean
 
 install:
+	@quartus_pgm -mas -o "p;$(FPGA_DIR)/out/minimig_de1.pof"
+
+test:
 	@quartus_pgm -mjtag -o "p;$(FPGA_DIR)/out/minimig_de1.sof"
