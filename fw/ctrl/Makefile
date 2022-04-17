@@ -8,11 +8,11 @@
 OR32_TOOLCHAIN_PATH=
 
 ifndef OR32_TOOLCHAIN_PATH
-OR32_TOOLCHAIN_PATH=/opt/or32-elf-1.0rc1/bin/
+OR32_TOOLCHAIN_PATH=/opt/or1k-elf/bin/
 endif
 
 ifndef CROSS_COMPILE
-CROSS_COMPILE = $(OR32_TOOLCHAIN_PATH)or32-elf-
+CROSS_COMPILE = $(OR32_TOOLCHAIN_PATH)or1k-elf-
 endif
 
 
@@ -31,7 +31,7 @@ RANLIB  = $(CROSS_COMPILE)ranlib
 # flags
 CFLAGS +=   -W -Winline -std=gnu99 -g \
             -Os \
-            -fomit-frame-pointer -ffreestanding -static -combine -fwhole-program \
+            -fomit-frame-pointer -ffreestanding -static -flto -fwhole-program \
             -fno-strict-aliasing \
             -fno-builtin -nostdlib \
             -Wl,--relax \

@@ -348,7 +348,11 @@ qmem_bus #(
 // OR1200 cpu                         //
 ////////////////////////////////////////
 
+`ifdef MINIMIG_MOR1KX
+mor1kx_wrapper #(
+`else
 or1200_top_wrapper #(
+`endif
   .AW       (MAW)             // address bus width
 ) ctrl_cpu (
   // system
