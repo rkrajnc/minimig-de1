@@ -38,15 +38,11 @@ HEX2MIF = $(HEX2MIF_DIR)hex2mif.py
 
 
 ### flags ###
-CFLAGS +=   -W -Wall -Wpadded -Winline -std=gnu99 -g \
-            -Os \
-            -fomit-frame-pointer -ffreestanding -static -flto -fwhole-program \
-            -fno-strict-aliasing \
-            -fno-builtin -nostdlib \
-            -Wl,--relax \
-            -msoft-mul -msoft-div
-
-LDFLAGS +=
+CFLAGS  =   -Wall -Wpadded -Winline -std=gnu99 -g -Os                   \
+            -fcommon -fomit-frame-pointer -ffreestanding -static -flto  \
+            -fno-strict-aliasing -U_FORTIFY_SOURCE -fno-stack-protector \
+            -fno-builtin -nostdlib -Wl,--relax -msoft-mul -msoft-div
+LDFLAGS =
 
 XXDFLAGS=-ps -c 4
 HEXFLAGS=-w 8 -s 1024 -n

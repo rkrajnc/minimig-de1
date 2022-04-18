@@ -29,17 +29,11 @@ RANLIB  = $(CROSS_COMPILE)ranlib
 
 
 # flags
-CFLAGS +=   -W -Winline -std=gnu99 -g \
-            -Os \
-            -fomit-frame-pointer -ffreestanding -static -flto -fwhole-program \
-            -fno-strict-aliasing \
-            -fno-builtin -nostdlib \
-            -Wl,--relax \
-            -msoft-mul -msoft-div
-# -fpack_struct
-# -Wpacked -Wpadded
-
-LDFLAGS +=
+CFLAGS  =   -Winline -std=gnu99 -g -Os -fcommon -fomit-frame-pointer  \
+            -ffreestanding -static -flto -fno-strict-aliasing         \
+            -U_FORTIFY_SOURCE -fno-stack-protector -fno-builtin       \
+            -nostdlib -Wl,--relax -msoft-mul -msoft-div
+LDFLAGS  =
 
 
 ### variables ###
@@ -48,9 +42,9 @@ BUILD_T=$$(date +%Y-%m-%d)
 BUILD_TIME=\"$(BUILD_T)\"
 BUILD_N=$$(cat build_num.txt)
 BUILD_NUM=\"$(BUILD_N)\"
-BUILD_R=$$(git rev-parse --verify HEAD)
+BUILD_R=$$(git rev-parse --verify HEAD 2>/dev/null || printf '%s\n' "norev")
 BUILD_REV=\"$(BUILD_R)\"
-BUILD_TG=$$(git describe --tags --abbrev=0)
+BUILD_TG=$$(git describe --tags --abbrev=0 2>/dev/null || printf '%s\n' "notag")
 BUILD_TAG=\"$(BUILD_TG)\"
 
 BINDIR=bin

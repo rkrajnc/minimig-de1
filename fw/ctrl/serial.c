@@ -123,7 +123,7 @@ char *next_word(const char *c)
   while ((*c!=0) && (*c!=' ')) c++;
   while (*c==' ') c++;
   if (*c==0) return NULL;
-  else return c;
+  else return (char *)c;
 }
 
 // txbuf_emit()
